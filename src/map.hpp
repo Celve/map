@@ -10,6 +10,13 @@
 #include "exceptions.hpp"
 
 namespace sjtu {
+    struct my_true_type {};
+    struct my_false_type {};
+
+    template<class T>
+    struct my_type_traits {
+        using iterator_assignable = typename T::iterator_assignable;
+    };
 
     template<
             class Key,
@@ -56,7 +63,7 @@ namespace sjtu {
             }
         };
 
-        Node *root, *fail;
+        Node *root, *verge;
         int n;
 
         bool Equal(const Key &a, const Key &b) const {
@@ -190,7 +197,7 @@ namespace sjtu {
             Node *x = root;
             while (true) {
                 if (!x)
-                    return fail;
+                    return verge;
                 if (Equal(key, x->package->first))
                     return x;
                 x = x->child[comp(key, x->package->first)];
@@ -264,40 +271,38 @@ namespace sjtu {
 
         void Delete(Node *x) {
             Node *y, *t;
-            Color temp;
-            bool flag = false;
+            Color removed;
+            bool flag = false; // delay removing it from tree
+            --n;
             if (x == root && !x->child[0] && !x->child[1]) {
-                --n;
                 root = nullptr;
                 delete x;
                 return;
             }
             if (!x->child[0] && !x->child[1]) {
-                temp = x->color;
+                removed = x->color;
                 t = y = x;
                 flag = true;
             }
             else if (!x->child[0] || !x->child[1]) {
-                temp = x->color;
+                removed = x->color;
                 y = x->child[(x->child[1] != nullptr)];
                 Transplant(t = x, y);
             }
             else {
                 Node *z = Minimum(x->child[1]);
                 std::swap(x->color, z->color);
+                SetFa(x->child[0], z);
+                SetFa(z->child[1], x);
                 if (z->fa == x) {
                     z->fa = x->fa;
                     x->fa = z;
-                    SetFa(x->child[0], z);
-                    SetFa(z->child[1], x);
                     std::swap(x->child, z->child);
                     z->child[1] = x;
                     ReplaceChild(z->fa, x, z);
                 }
                 else {
-                    SetFa(x->child[0], z);
                     SetFa(x->child[1], z);
-                    SetFa(z->child[1], x);
                     ReplaceChild(x->fa, x, z);
                     ReplaceChild(z->fa, z, x);
                     std::swap(x->child, z->child);
@@ -305,7 +310,7 @@ namespace sjtu {
                 }
                 if (!z->fa)
                     root = z;
-                temp = x->color;
+                removed = x->color;
                 if (!x->child[1]) {
                     t = y = x;
                     flag = true;
@@ -315,12 +320,11 @@ namespace sjtu {
                     Transplant(t = x, y);
                 }
             }
-            if (temp == BLACK && y)
+            if (removed == BLACK && y)
                 DeleteFixUp(y);
             y = t->fa;
             if (flag && y)
-                y->child[y->ChildNumber(t)] = nullptr;
-            --n;
+                ReplaceChild(y, t, nullptr);
             delete t;
         }
 
@@ -347,18 +351,19 @@ namespace sjtu {
                         ptr = ptr->fa;
                     }
                     if (!ptr)
-                        ptr = source->fail;
+                        ptr = source->verge;
                 }
                 else
-                    ptr = source->fail;
+                    ptr = source->verge;
             }
 
         public:
             using difference_type = std::ptrdiff_t;
-            using value = Value;
+            using value_type = Value;
             using pointer = Value*;
             using reference = Value&;
             using iterator_category = std::output_iterator_tag;
+            using iterator_assignable = my_true_type;
 
             iterator() {
                 ptr = nullptr;
@@ -376,7 +381,7 @@ namespace sjtu {
             }
 
             iterator & operator++() {
-                if (ptr == source->fail)
+                if (ptr == source->verge)
                     throw invalid_iterator();
                 Move(1);
                 return *this;
@@ -389,16 +394,16 @@ namespace sjtu {
             }
 
             iterator & operator--() {
-                if (ptr == source->fail)
+                if (ptr == source->verge)
                     ptr = source->End();
                 else
                     Move(0);
-                if (ptr == source->fail)
+                if (ptr == source->verge)
                     throw invalid_iterator();
                 return *this;
             }
 
-            value_type & operator*() const {
+            map::value_type & operator*() const {
                 return *ptr->package;
             }
 
@@ -417,7 +422,7 @@ namespace sjtu {
                 return ptr != rhs.ptr;
             }
 
-            value_type* operator->() const noexcept {
+            map::value_type* operator->() const noexcept {
                 return ptr->package;
             }
         };
@@ -442,13 +447,19 @@ namespace sjtu {
                         ptr = ptr->fa;
                     }
                     if (!ptr)
-                        ptr = source->fail;
+                        ptr = source->verge;
                 }
                 else
-                    ptr = source->fail;
+                    ptr = source->verge;
             }
 
         public:
+            using difference_type = std::ptrdiff_t;
+            using value_type = Value;
+            using pointer = Value*;
+            using reference = Value&;
+            using iterator_category = std::output_iterator_tag;
+            using iterator_assignable = my_false_type;
             const_iterator() {
                 ptr = nullptr;
                 source = nullptr;
@@ -467,7 +478,7 @@ namespace sjtu {
             }
 
             const_iterator & operator++() {
-                if (ptr == source->fail)
+                if (ptr == source->verge)
                     throw invalid_iterator();
                 Move(1);
                 return *this;
@@ -480,16 +491,16 @@ namespace sjtu {
             }
 
             const_iterator & operator--() {
-                if (ptr == source->fail)
+                if (ptr == source->verge)
                     ptr = source->End();
                 else
                     Move(0);
-                if (ptr == source->fail)
+                if (ptr == source->verge)
                     throw invalid_iterator();
                 return *this;
             }
 
-            const value_type & operator*() const {
+            const map::value_type & operator*() const {
                 return *ptr->package;
             }
 
@@ -509,7 +520,7 @@ namespace sjtu {
                 return ptr != rhs.ptr;
             }
 
-            const value_type* operator->() const noexcept {
+            const map::value_type* operator->() const noexcept {
                 return ptr->package;
             }
         };
@@ -529,13 +540,13 @@ namespace sjtu {
 
         map() {
             root = nullptr;
-            fail = new Node;
+            verge = new Node;
             n = 0;
         }
         map(const map &other) {
             root = nullptr;
             n = 0;
-            fail = new Node;
+            verge = new Node;
             Construct(root, other.root);
         }
 
@@ -550,19 +561,19 @@ namespace sjtu {
 
         ~map() {
             Destruct(root);
-            delete fail;
+            delete verge;
         }
 
         Value & at(const Key &key) {
             Node *x = Find(key);
-            if (x == fail)
+            if (x == verge)
                 throw index_out_of_bound();
             return x->package->second;
         }
 
         const Value & at(const Key &key) const {
             Node *x = Find(key);
-            if (x == fail)
+            if (x == verge)
                 throw index_out_of_bound();
             return x->package->second;
         }
@@ -579,7 +590,7 @@ namespace sjtu {
         iterator begin() {
             Node *x = root;
             if (!x)
-                return iterator(fail, this);
+                return iterator(verge, this);
             while (x->child[1])
                 x = x->child[1];
             return iterator(x, this);
@@ -588,24 +599,24 @@ namespace sjtu {
         const_iterator cbegin() const {
             Node *x = root;
             if (!x)
-                return iterator(fail, this);
+                return iterator(verge, this);
             while (x->child[1])
                 x = x->child[1];
             return const_iterator(x, this);
         }
 
         iterator end() {
-            return iterator(fail, this);
+            return iterator(verge, this);
         }
 
         const_iterator cend() const {
-            return iterator(fail, this);
+            return iterator(verge, this);
         }
 
         Node *End() const {
             Node *x = root;
             if (!x)
-                return fail;
+                return verge;
             while (x->child[0])
                 x = x->child[0];
             return x;
@@ -626,7 +637,7 @@ namespace sjtu {
 
         pair<iterator, bool> insert(const value_type &value) {
             Node *y = Find(value.first);
-            if (y == fail) {
+            if (y == verge) {
                 Node *x = Insert(value.first);
                 x->package->second = value.second;
                 return pair<iterator, bool>(iterator(x, this), true);
@@ -636,13 +647,13 @@ namespace sjtu {
 
         void erase(iterator pos) {
             CheckIterator(pos);
-            if (pos.ptr == fail)
+            if (pos.ptr == verge)
                 throw invalid_iterator();
             Delete(pos.ptr);
         }
 
         size_t count(const Key &key) const {
-            return Find(key) != fail;
+            return Find(key) != verge;
         }
 
         iterator find(const Key &key) {
@@ -656,6 +667,7 @@ namespace sjtu {
             Debug(root);
         }
     };
+
 
 }
 
