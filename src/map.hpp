@@ -20,11 +20,6 @@ template<
 	class Compare = std::less<Key>
 > class map {
 public:
-    /**
-     * the internal type of data.
-     * it should have a default constructor, a copy constructor.
-     * You can use sjtu::map as value_type by typedef.
-     */
     typedef pair<const Key, Value> value_type;
     
 private:
@@ -260,6 +255,16 @@ private:
         }
     }
 
+    void SetFa(Node *x, Node *y) {
+        if (x)
+            x->fa = y;
+    }
+
+    void ReplaceChild(Node *x, Node *y, Node *z) {
+        if (x)
+            x->child[x->ChildNumber(y)] = z;
+    }
+
     void Delete(Node *x) {
         Node *y, *t;
         Color temp;
@@ -282,15 +287,35 @@ private:
         }
         else {
             Node *z = Minimum(x->child[1]);
-            std::swap(x->package, z->package);
-            temp = z->color;
-            if (!z->child[1]) {
-                t = y = z;
+            std::swap(x->color, z->color);
+            if (z->fa == x) {
+                z->fa = x->fa;
+                x->fa = z;
+                SetFa(x->child[0], z);
+                SetFa(z->child[1], x);
+                std::swap(x->child, z->child);
+                z->child[1] = x;
+                ReplaceChild(z->fa, x, z);
+            }
+            else {
+                SetFa(x->child[0], z);
+                SetFa(x->child[1], z);
+                SetFa(z->child[1], x);
+                ReplaceChild(x->fa, x, z);
+                ReplaceChild(z->fa, z, x);
+                std::swap(x->child, z->child);
+                std::swap(x->fa, z->fa);
+            }
+            if (!z->fa)
+                root = z;
+            temp = x->color;
+            if (!x->child[1]) {
+                t = y = x;
                 flag = true;
             }
             else {
-                y = z->child[1];
-                Transplant(t = z, y);
+                y = x->child[1];
+                Transplant(t = x, y);
             }
         }
         if (temp == BLACK && y)
@@ -468,6 +493,7 @@ public:
             else
                 ptr = source->nil;
         }
+
     
         // data members.
     public:
@@ -546,6 +572,19 @@ public:
             return ptr->package;
         }
 	};
+
+private:
+    void CheckIterator(iterator it) {
+        if (it.source != this)
+            throw invalid_iterator();
+    }
+
+    void CheckIterator(const_iterator it) {
+        if (it.source != this)
+            throw invalid_iterator();
+    }
+
+public:
 	/**
 	 * TODO two constructors
 	 */
@@ -555,6 +594,7 @@ public:
         n = 0;
     }
 	map(const map &other) {
+        root = nullptr;
         n = 0;
         nil = new Node;
         Construct(root, other.root);
@@ -691,6 +731,9 @@ public:
 	 * throw if pos pointed to a bad element (pos == this->end() || pos points an element out of this)
 	 */
 	void erase(iterator pos) {
+        CheckIterator(pos);
+        if (pos.ptr == nil)
+            throw invalid_iterator();
         Delete(pos.ptr);
     }
 	/**
