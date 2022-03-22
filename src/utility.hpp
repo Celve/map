@@ -22,13 +22,6 @@ public:
 	pair(pair<U1, U2> &&other) : first(other.first), second(other.second) {}
 };
 
-template<class T>
-void Swap(T &a, T &b) {
-    T c = a;
-    a = b;
-    b = c;
-}
-
 }
 
 #endif

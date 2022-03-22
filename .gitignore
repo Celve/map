@@ -1,3 +1,6 @@
+.DS_Store
 cmake-build-debug
+src/map2.hpp
 .idea
+log
 
